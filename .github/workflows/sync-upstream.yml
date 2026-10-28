@@ -1,0 +1,38 @@
+# Upstream auto-sync for slynnnn/snell
+# This repo is a clean import of xOS/Snell (not a fork). It syncs by
+# copying upstream files over master, without force-pushing, so the
+# sync commit never tries to push upstream workflow files.
+# Upstream .github is excluded, so no Gitee sync files are brought back.
+# Consequence: code customisation made directly on master will be
+# overwritten by the next sync.
+name: Sync Upstream
+on:
+  schedule:
+    - cron: '0 20 * * *'  # daily, 20:00 UTC = 04:00 Beijing next day
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Sync files from upstream
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/xOS/Snell.git || true
+          git fetch upstream master
+          mkdir -p /tmp/upstream
+          git archive upstream/master | tar -x -C /tmp/upstream
+          rsync -a --delete --exclude='.git/' --exclude='.github/' /tmp/upstream/ ./
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Already in sync, nothing to commit."
+          else
+            git commit -m "chore: sync from upstream xOS/Snell"
+            git push origin master
+          fi
